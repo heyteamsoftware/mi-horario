@@ -1,0 +1,41 @@
+name: Preparar recursos para Play Console
+
+on:
+  workflow_run:
+    workflows: ["Compilar AAB para Google Play"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  recursos:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Descargar el AAB recién compilado
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rm -rf play && mkdir play
+          TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+          gh release download "$TAG" --pattern '*.aab' --dir play
+
+      - name: Generar icono, gráfico destacado y capturas
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq fonts-inter fonts-noto-color-emoji > /dev/null
+          pip install --quiet playwright
+          python3 -m playwright install --with-deps chromium > /dev/null
+          tar xJf proyecto.txz
+          cd play && python3 ../MiHorario/herramientas/graficos.py && ls -la
+
+      - name: Guardar en la carpeta play/
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add play
+          git commit -m "Recursos para Play Console" || exit 0
+          git push
