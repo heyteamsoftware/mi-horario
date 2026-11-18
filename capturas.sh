@@ -6,7 +6,7 @@ OUT=play/capturas-reales; mkdir -p $OUT
 APK=$(ls apk/*.apk | head -1)
 
 ui()     { adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1; python3 ui.py /tmp/ui.xml "$1"; }
-busca()  { for i in $(seq 1 ${2:-1}); do c=$(ui "$1"); [ -n "$c" ] && { echo "$c"; return 0; }; adb shell input swipe 540 1400 540 900 500; sleep 1; done; return 1; }
+busca()  { n=${2:-1}; for i in $(seq 1 $n); do c=$(ui "$1"); [ -n "$c" ] && { echo "$c"; return 0; }; [ $i -lt $n ] && { adb shell input swipe 540 1400 540 900 500; sleep 1; }; done; return 1; }
 toca()   { c=$(busca "$1" ${2:-1}) && { adb shell input tap $c; sleep 2; return 0; }; return 1; }
 arriba() { c=$(busca "$1" 15) || return 1; y=${c#* }; d=$((y-$2)); [ $d -gt 0 ] && adb shell input swipe 540 1500 540 $((1500-d)) 1500; sleep 2; }
 fecha()  { adb shell date 1116$1$2"2026.00"; sleep 4; adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm $1$2; }
@@ -41,9 +41,13 @@ sleep 3
 # 1 · Widget en el escritorio
 inicio
 toca "Añadir el widget" 5
-sleep 3; toca "autom" || toca "^añadir$|^add$"
-sleep 2; adb shell input keyevent KEYCODE_HOME; sleep 3
-fecha 11 02; adb shell input keyevent KEYCODE_HOME; foto 1_escritorio
+sleep 4; foto dbg_1_dialogo
+toca "autom" || toca "^añadir$" || toca "^add" || toca "añadir"
+sleep 4; foto dbg_2_tras_confirmar
+adb shell input keyevent KEYCODE_HOME; sleep 3
+fecha 11 02
+for p in 1 2 3 4; do sleep 2; [ -n "$(ui 'Inglés|SIGUIENTE')" ] && break; adb shell input swipe 950 900 120 900 300; done
+foto 1_escritorio
 
 # 2 · Pantalla de bloqueo
 fecha 11 04
