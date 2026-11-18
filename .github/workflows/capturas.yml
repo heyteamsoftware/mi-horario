@@ -1,0 +1,50 @@
+name: Capturas reales para Google Play
+
+on:
+  workflow_dispatch:
+  push:
+    paths: ['capturas.sh', 'ui.py', '.github/workflows/capturas.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  capturas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Activar KVM (aceleración del emulador)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Descargar el APK de la última versión
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+          gh release download "$TAG" --pattern '*.apk' --dir apk
+          ls -la apk
+
+      - name: Emulador Android y capturas
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash ./capturas.sh
+
+      - name: Guardar las capturas en play/capturas-reales
+        if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add play/capturas-reales || true
+          git commit -m "Capturas reales para Google Play" || exit 0
+          git pull --rebase && git push
